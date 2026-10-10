@@ -1,0 +1,55 @@
+
+name: Test Video API
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start API
+        run: |
+          node index.js > api.log 2>&1 &
+          echo $! > api.pid
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/; then
+              echo "API is responding"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat api.log
+          exit 1
+
+      - name: Test EPorner search
+        run: |
+          curl -fG \
+            --data-urlencode "page=1" \
+            --data-urlencode "per_page=5" \
+            http://localhost:3000/api/eporner/search/indian
+
+      - name: Test XHamster search
+        continue-on-error: true
+        run: |
+          curl -fG \
+            --data-urlencode "page=1" \
+            http://localhost:3000/api/xhamster/search/indian
